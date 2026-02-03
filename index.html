@@ -132,7 +132,7 @@
         async function fetchOdds() {
             const token = document.getElementById('tokenInput').value.trim().replace('Bearer ', '');
             try {
-                const response = await fetch('http://localhost:3000/get-odds', { headers: { 'authorization': `Bearer ${token}` } });
+                const response = await fetch('https://oddscanner.onrender.com/get-odds', { headers: { 'authorization': `Bearer ${token}` } });
                 const result = await response.json();
 
                 const processedData = result.data.map(item => {
@@ -209,7 +209,7 @@
         async function updateModalDetails(slug) {
             const token = document.getElementById('tokenInput').value.trim().replace('Bearer ', '');
             try {
-                const response = await fetch(`http://localhost:3000/get-details?slug=${encodeURIComponent(slug)}`, { headers: { 'authorization': `Bearer ${token}` } });
+                const response = await fetch(`https://oddscanner.onrender.com/get-details?slug=${encodeURIComponent(slug)}`, { headers: { 'authorization': `Bearer ${token}` } });
                 const result = await response.json();
                 const jogo = result.data;
 
