@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arbitrage Scanner - Pro Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+
+        .modal-animate {
+            animation: fadeIn 0.2s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: scale(0.95);
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+    </style>
+</head>
+
+<body class="bg-slate-900 text-slate-100 min-h-screen font-sans text-xs md:text-sm">
+
+    <div class="max-w-5xl mx-auto p-4 md:p-8">
+        <div class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+            <div>
+                <h1 class="text-3xl font-black text-blue-500 tracking-tight italic">SCANNER <span
+                        class="text-white">ROI</span></h1>
+                <p class="text-slate-400 text-[10px] uppercase tracking-widest font-bold">Odds 1 & 2 filtradas por
+                    Pagamento Antecipado</p>
+            </div>
+            <div id="timerDisplay"
+                class="bg-slate-800 border border-slate-700 px-4 py-2 rounded-xl font-mono text-blue-400 shadow-lg text-center min-w-[200px]">
+                Status: Aguardando Token
+            </div>
+        </div>
+
+        <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-2xl mb-8">
+            <label class="block text-[10px] font-black text-slate-500 uppercase mb-2 tracking-widest">Bearer Token
+                (JWT)</label>
+            <textarea id="tokenInput" rows="2"
+                class="w-full bg-slate-900 border border-slate-700 rounded-xl p-4 font-mono text-blue-300 outline-none focus:border-blue-500 transition-all placeholder:text-slate-700"
+                placeholder="Cole o token aqui..."></textarea>
+
+            <button onclick="startAutoUpdate()" id="mainBtn"
+                class="mt-4 w-full bg-blue-600 hover:bg-blue-500 text-white py-4 rounded-xl font-black uppercase tracking-widest transition-all active:scale-[0.98] shadow-xl flex justify-center items-center gap-2">
+                <span id="btnIcon">🚀</span> <span id="btnText">Iniciar Monitoramento (10s)</span>
+            </button>
+        </div>
+
+        <div id="statusMessage" class="mb-6 text-center font-medium"></div>
+        <div id="oddsContainer" class="grid gap-4"></div>
+    </div>
+
+    <div id="modal"
+        class="fixed inset-0 bg-slate-950/90 hidden backdrop-blur-sm z-50 flex items-center justify-center p-4 text-slate-100">
+        <div
+            class="bg-slate-800 w-full max-w-3xl max-h-[95vh] rounded-3xl overflow-hidden border border-slate-700 shadow-2xl modal-animate flex flex-col">
+            <div class="p-6 border-b border-slate-700 flex justify-between items-center bg-slate-800/50">
+                <h3 class="text-xl font-black uppercase tracking-tighter italic" id="modalMatchTitle">Informações do
+                    Jogo</h3>
+                <button onclick="closeModal()"
+                    class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-700 transition-colors text-slate-400 hover:text-white text-2xl">&times;</button>
+            </div>
+            <div id="modalContent" class="p-6 overflow-y-auto"></div>
+        </div>
+    </div>
+
+    <script>
+        let updateInterval = null;
+        let timeLeft = 10;
+        let timerId = null;
+        let currentActiveSlug = null;
+
+        function startAutoUpdate() {
+            if (!document.getElementById('tokenInput').value.trim()) return alert("Insira o token.");
+            document.getElementById('btnText').innerText = "Monitorando...";
+            if (updateInterval) clearInterval(updateInterval);
+            if (timerId) clearInterval(timerId);
+
+            fetchOdds();
+            updateInterval = setInterval(() => {
+                fetchOdds();
+                if (currentActiveSlug) updateModalDetails(currentActiveSlug);
+            }, 10000);
+
+            timerId = setInterval(() => {
+                if (timeLeft <= 1) timeLeft = 10; else timeLeft--;
+                document.getElementById('timerDisplay').innerText = `PRÓXIMO SCAN EM: ${timeLeft}s`;
+            }, 1000);
+        }
+
+        // Função de cálculo de ROI customizada para a regra: 1 e 2 P.A / X Livre
+        function calculateCustomArbitrage(books) {
+            const grupoPA = books.filter(b => !b.bookmaker.toLowerCase().endsWith('so') && !b.bookmaker.toLowerCase().includes('pinnacle'));
+
+            if (grupoPA.length === 0) return null;
+
+            const best1 = grupoPA.reduce((prev, curr) => (curr.odd1 > prev.odd1) ? curr : prev, { odd1: 0, bookmaker: 'N/A' });
+            const best2 = grupoPA.reduce((prev, curr) => (curr.odd2 > prev.odd2) ? curr : prev, { odd2: 0, bookmaker: 'N/A' });
+            const bestX = books.reduce((prev, curr) => (curr.oddX > prev.oddX) ? curr : prev, { oddX: 0, bookmaker: 'N/A' });
+
+            const margin = (1 / best1.odd1) + (1 / bestX.oddX) + (1 / best2.odd2);
+            const roi = ((1 / margin) - 1) * 100;
+
+            return { best1, bestX, best2, roi };
+        }
+
+        async function fetchOdds() {
+            const token = document.getElementById('tokenInput').value.trim().replace('Bearer ', '');
+            try {
+                const response = await fetch('http://localhost:3000/get-odds', { headers: { 'authorization': `Bearer ${token}` } });
+                const result = await response.json();
+
+                const processedData = result.data.map(item => {
+                    const arb = calculateCustomArbitrage(item.books);
+                    return { ...item, customArb: arb };
+                })
+                    .filter(item => item.customArb !== null)
+                    .sort((a, b) => b.customArb.roi - a.customArb.roi);
+
+                renderList(processedData);
+                timeLeft = 10;
+                document.getElementById('statusMessage').innerHTML = `<span class="text-blue-400 font-bold uppercase text-[10px]">Última atualização: ${new Date().toLocaleTimeString()}</span>`;
+            } catch (error) { document.getElementById('statusMessage').innerText = "Erro de Conexão."; }
+        }
+
+        function renderList(jogos) {
+            const container = document.getElementById('oddsContainer');
+            container.innerHTML = '';
+            jogos.forEach(item => {
+                const arb = item.customArb;
+                const card = document.createElement('div');
+                card.className = `bg-slate-800 p-5 rounded-2xl border border-slate-700 hover:border-blue-500/50 transition-all shadow-lg flex flex-col md:flex-row justify-between items-center gap-4`;
+
+                card.innerHTML = `
+                    <div class="flex-1 cursor-pointer w-full" onclick="openDetails('${item.key}')">
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="bg-blue-500/10 text-blue-500 text-[9px] font-black px-2 py-0.5 rounded uppercase tracking-tighter">${item.match.competition || 'Futebol'}</span>
+                            <span class="text-slate-500 text-[10px] font-bold">${item.match.kickoff_display}</span>
+                        </div>
+                        <h2 class="text-lg font-bold">${item.match.team1} x ${item.match.team2}</h2>
+                    </div>
+                    <div class="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
+                        <div class="flex gap-2 text-center font-mono">
+                            <div class="bg-slate-900 w-14 py-1.5 rounded-lg border border-slate-700">
+                                <span class="block text-[7px] text-slate-500">1 (PA)</span>
+                                <span class="font-bold text-green-400">${arb.best1.odd1.toFixed(2)}</span>
+                            </div>
+                            <div class="bg-slate-900 w-14 py-1.5 rounded-lg border border-slate-700 text-slate-300">
+                                <span class="block text-[7px] text-slate-500">X</span>
+                                <span>${arb.bestX.oddX.toFixed(2)}</span>
+                            </div>
+                            <div class="bg-slate-900 w-14 py-1.5 rounded-lg border border-slate-700">
+                                <span class="block text-[7px] text-slate-500">2 (PA)</span>
+                                <span class="font-bold text-green-400">${arb.best2.odd2.toFixed(2)}</span>
+                            </div>
+                        </div>
+                        <div class="text-right min-w-[80px]">
+                            <span class="block text-[9px] text-slate-500 font-black uppercase">ROI P.A.</span>
+                            <span class="text-xl font-black ${arb.roi > 0 ? "text-green-400" : "text-rose-500"}">${arb.roi.toFixed(2)}%</span>
+                        </div>
+                    </div>`;
+                container.appendChild(card);
+            });
+        }
+
+        async function openDetails(slug) {
+            currentActiveSlug = slug;
+            document.getElementById('modal').classList.remove('hidden');
+            document.getElementById('modalContent').innerHTML = `<div class="py-20 text-center text-blue-400 animate-pulse font-bold uppercase text-xs tracking-widest">Carregando Mercado...</div>`;
+            updateModalDetails(slug);
+        }
+
+        function getCalcLink(b1, bX, b2) {
+            const config = {
+                numberOfHouses: 3,
+                casaName1: b1.bookmaker.toUpperCase(), odd1: b1.odd1,
+                casaName2: bX.bookmaker.toUpperCase(), odd2: bX.oddX,
+                casaName3: b2.bookmaker.toUpperCase(), odd3: b2.odd2,
+                stake1: 100, selectedStake: "stake1", isLay1: false, isLay2: false, isLay3: false, profits: [0, 0, 0]
+            };
+            return `https://filtrodeapostas.com/calculator?arbitrage=${encodeURIComponent(JSON.stringify(config))}`;
+        }
+
+        async function updateModalDetails(slug) {
+            const token = document.getElementById('tokenInput').value.trim().replace('Bearer ', '');
+            try {
+                const response = await fetch(`http://localhost:3000/get-details?slug=${encodeURIComponent(slug)}`, { headers: { 'authorization': `Bearer ${token}` } });
+                const result = await response.json();
+                const jogo = result.data;
+
+                // Informações do Jogo no Título
+                document.getElementById('modalMatchTitle').innerHTML = `
+                    <div class="flex flex-col">
+                        <span class="text-white">${jogo.match.team1} x ${jogo.match.team2}</span>
+                        <span class="text-[10px] text-slate-500 font-normal mt-1 italic tracking-normal">${jogo.match.competition} | ${jogo.match.date} ${jogo.match.kickoff_display}</span>
+                    </div>
+                `;
+
+                const arb = calculateCustomArbitrage(jogo.books);
+                const calcLink = getCalcLink(arb.best1, arb.bestX, arb.best2);
+
+                const grupoPA = jogo.books.filter(b => !b.bookmaker.toLowerCase().endsWith('so') && !b.bookmaker.toLowerCase().includes('pinnacle'));
+                const grupoSO = jogo.books.filter(b => b.bookmaker.toLowerCase().endsWith('so') || b.bookmaker.toLowerCase().includes('pinnacle'));
+
+                document.getElementById('modalContent').innerHTML = `
+                    <a href="${calcLink}" target="_blank" class="grid grid-cols-3 gap-4 mb-8 group hover:scale-[1.02] transition-transform">
+                        <div class="bg-slate-900 p-4 rounded-2xl border border-green-500/30 text-center shadow-lg group-hover:border-green-400 transition-colors">
+                            <span class="text-[8px] font-black text-green-400 uppercase tracking-widest block mb-1">CASA (P.A)</span>
+                            <div class="text-2xl font-black text-white">${arb.best1.odd1.toFixed(2)}</div>
+                            <div class="text-[9px] font-bold text-slate-500 uppercase">${arb.best1.bookmaker}</div>
+                        </div>
+                        <div class="bg-slate-900 p-4 rounded-2xl border border-blue-500/30 text-center shadow-lg group-hover:border-blue-400 transition-colors">
+                            <span class="text-[8px] font-black text-blue-400 uppercase tracking-widest block mb-1">EMPATE (X)</span>
+                            <div class="text-2xl font-black text-white">${arb.bestX.oddX.toFixed(2)}</div>
+                            <div class="text-[9px] font-bold text-slate-500 uppercase">${arb.bestX.bookmaker}</div>
+                        </div>
+                        <div class="bg-slate-900 p-4 rounded-2xl border border-green-500/30 text-center shadow-lg group-hover:border-green-400 transition-colors">
+                            <span class="text-[8px] font-black text-green-400 uppercase tracking-widest block mb-1">FORA (P.A)</span>
+                            <div class="text-2xl font-black text-white">${arb.best2.odd2.toFixed(2)}</div>
+                            <div class="text-[9px] font-bold text-slate-500 uppercase">${arb.best2.bookmaker}</div>
+                        </div>
+                        <div class="col-span-full text-center text-[10px] text-slate-500 font-bold uppercase tracking-tighter mt-1 group-hover:text-blue-400 transition-colors italic">
+                            🧮 ROI P.A: ${arb.roi.toFixed(2)}% | Clique para calcular
+                        </div>
+                    </a>
+
+                    <div class="space-y-6">
+                        <div>
+                            <h3 class="text-green-400 text-[10px] font-black uppercase mb-3 flex items-center gap-2">🟢 Com Pagamento Antecipado</h3>
+                            ${renderTable(grupoPA)}
+                        </div>
+                        <div>
+                            <h3 class="text-slate-500 text-[10px] font-black uppercase mb-3 flex items-center gap-2">⚪ Sem Pagamento Antecipado / "SO"</h3>
+                            ${renderTable(grupoSO)}
+                        </div>
+                    </div>
+                    <p class="mt-4 text-[9px] text-center text-slate-600 italic uppercase italic">Atualizado: ${new Date().toLocaleTimeString()}</p>`;
+            } catch (e) { document.getElementById('modalContent').innerHTML = `<p class="text-red-500 text-center">Falha ao atualizar.</p>`; }
+        }
+
+        function renderTable(lista) {
+            if (!lista.length) return `<p class="text-slate-600 text-[10px] italic p-4 text-center">Nenhuma casa registrada.</p>`;
+            const max1 = Math.max(...lista.map(b => b.odd1)), maxX = Math.max(...lista.map(b => b.oddX)), max2 = Math.max(...lista.map(b => b.odd2));
+
+            return `
+                <div class="overflow-hidden rounded-2xl border border-slate-700/50 shadow-inner">
+                    <table class="w-full text-left text-xs font-mono">
+                        <thead class="bg-slate-900 text-slate-500 uppercase text-[8px] font-black tracking-widest">
+                            <tr><th class="px-4 py-3">Bookmaker</th><th class="px-4 py-3 text-center">1</th><th class="px-4 py-3 text-center">X</th><th class="px-4 py-3 text-center">2</th></tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-700/50 bg-slate-800/40">
+                            ${lista.map(b => `
+                                <tr class="hover:bg-slate-700/30 transition-colors">
+                                    <td class="px-4 py-3 font-bold"><a href="${b.href || '#'}" target="_blank" class="text-blue-400 hover:text-white">${b.bookmaker}</a></td>
+                                    <td class="px-4 py-3 text-center ${b.odd1 === max1 ? 'text-green-400 font-black bg-green-400/5 shadow-[inset_0_0_10px_rgba(74,222,128,0.1)]' : 'text-slate-400'}">${b.odd1.toFixed(2)}</td>
+                                    <td class="px-4 py-3 text-center ${b.oddX === maxX ? 'text-green-400 font-black bg-green-400/5 shadow-[inset_0_0_10px_rgba(74,222,128,0.1)]' : 'text-slate-400'}">${b.oddX.toFixed(2)}</td>
+                                    <td class="px-4 py-3 text-center ${b.odd2 === max2 ? 'text-green-400 font-black bg-green-400/5 shadow-[inset_0_0_10px_rgba(74,222,128,0.1)]' : 'text-slate-400'}">${b.odd2.toFixed(2)}</td>
+                                </tr>`).join('')}
+                        </tbody>
+                    </table>
+                </div>`;
+        }
+
+        function closeModal() { currentActiveSlug = null; document.getElementById('modal').classList.add('hidden'); }
+    </script>
+</body>
+
+</html>
