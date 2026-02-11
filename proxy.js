@@ -7,6 +7,15 @@ const app = express()
 app.use(cors()) // Libera o acesso para o seu frontend
 app.use(express.json())
 
+app.get("/status", (req, res) => {
+	return res.status(200).json({
+		ok: true,
+		message: "Proxy local rodando",
+		uptime: process.uptime(),
+		timestamp: new Date().toISOString(),
+	})
+})
+
 app.get("/get-odds", async (req, res) => {
 	const token = req.headers.authorization
 
@@ -40,8 +49,28 @@ app.get("/get-details", async (req, res) => {
 		})
 		res.json(response.data)
 	} catch (e) {
-		res.status(500).send("Erro ao buscar detalhes do jogo")
+		console.error(e.response?.data || e.message)
+
+		res.status(e.response?.status || 500).json({
+			error: e.response?.data || e.message,
+		})
 	}
+})
+
+let SAVED_TOKEN = ""
+
+app.post("/save-token", (req, res) => {
+	SAVED_TOKEN = req.body.token
+
+	res.json({
+		ok: true,
+	})
+})
+
+app.get("/get-token", (req, res) => {
+	res.json({
+		token: SAVED_TOKEN,
+	})
 })
 
 const PORT = process.env.PORT || 3000

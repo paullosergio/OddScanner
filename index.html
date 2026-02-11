@@ -63,6 +63,20 @@
         let timerId = null;
         let currentActiveSlug = null;
         let cachedJogos = []; // Armazena os dados para filtrar sem nova requisição
+        let apiStatusInterval = null;
+        let apiReady = false;
+
+        async function loadToken() {
+        const res = await fetch("https://oddscanner.onrender.com/get-token");
+        const data = await res.json();
+
+        if (data.token) {
+            document.getElementById("tokenInput").value = data.token;
+        }
+        }
+
+        window.onload = loadToken;
+
 
         function adjustTime(timeStr) {
             if (!timeStr || !timeStr.includes(':')) return timeStr;
@@ -71,20 +85,96 @@
             return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
         }
 
-        function startAutoUpdate() {
-            if (!document.getElementById('tokenInput').value.trim()) return alert("Insira o token.");
-            document.getElementById('btnText').innerText = "Monitorando...";
+        async function checkApiStatus() {
+            const tokenValue = document.getElementById('tokenInput').value.trim();
+            const mainBtn = document.getElementById('mainBtn');
+            const searchInput = document.getElementById('searchInput');
+            const timerDisplayElement = document.getElementById('timerDisplay');
+            const statusMessageElement = document.getElementById('statusMessage');
+
+            if (!tokenValue) {
+                apiReady = false;
+                mainBtn.disabled = true;
+                searchInput.disabled = true;
+                mainBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                timerDisplayElement.innerText = "Status: Aguardando Token";
+                return;
+            }
+
+            timerDisplayElement.innerText = "Verificando status da API...";
+
+            try {
+                // Verifica diretamente o status da API principal
+                const statusResponse = await fetch('https://oddscanner.onrender.com/status');
+
+                if (!statusResponse.ok) {
+                    throw new Error('Falha na verificação de status');
+                }
+
+                let statusText = statusResponse.status;
+                try {
+                    const statusData = await statusResponse.json();
+                    statusText = statusData.status || statusText;
+                } catch {
+                    // Se não for JSON, usa apenas o status HTTP
+                }
+
+                apiReady = true;
+                mainBtn.disabled = false;
+                searchInput.disabled = false;
+                mainBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                statusMessageElement.innerHTML = `API Online (status ${statusText})`;
+                timerDisplayElement.innerText = "API Online - pronto para monitorar";
+
+                if (apiStatusInterval) {
+                    clearInterval(apiStatusInterval);
+                    apiStatusInterval = null;
+                }
+            } catch {
+                apiReady = false;
+                mainBtn.disabled = true;
+                searchInput.disabled = true;
+                mainBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                statusMessageElement.innerText = "API offline ou inacessível. Tentando novamente a cada 5s...";
+                timerDisplayElement.innerText = "API Offline";
+            }
+        }
+
+        async function startAutoUpdate() {
+            const tokenElement = document.getElementById('tokenInput');
+            const tokenValue = tokenElement.value.trim();
+            if (!tokenValue) return alert("Insira o token.");
+
+            if (!apiReady) {
+                alert("Aguardando a API ficar online. Por favor, aguarde alguns segundos.");
+                return;
+            }
+
+            const mainBtn = document.getElementById('mainBtn');
+            const btnText = document.getElementById('btnText');
+            const btnIcon = document.getElementById('btnIcon');
+            const timerDisplayElement = document.getElementById('timerDisplay');
+
+            // API já está OK, apenas inicia o monitoramento
+            btnText.innerText = "Monitorando...";
+            btnIcon.textContent = "🚀";
+
             if (updateInterval) clearInterval(updateInterval);
             if (timerId) clearInterval(timerId);
+
             fetchOdds();
             updateInterval = setInterval(() => {
                 fetchOdds();
                 if (currentActiveSlug) updateModalDetails(currentActiveSlug);
             }, 10000);
+
             timerId = setInterval(() => {
                 if (timeLeft <= 1) timeLeft = 10; else timeLeft--;
-                document.getElementById('timerDisplay').innerText = `PRÓXIMO SCAN EM: ${timeLeft}s`;
+                timerDisplayElement.innerText = `PRÓXIMO SCAN EM: ${timeLeft}s`;
             }, 1000);
+
+            mainBtn.disabled = false;
+            mainBtn.classList.remove('opacity-50', 'cursor-not-allowed');
         }
 
         function handleSearch() {
@@ -236,6 +326,32 @@
         }
 
         function closeModal() { currentActiveSlug = null; document.getElementById('modal').classList.add('hidden'); }
+
+        // Inicializa verificação automática de status da API a cada 5s
+        window.addEventListener('load', () => {
+            const mainBtn = document.getElementById('mainBtn');
+            const searchInput = document.getElementById('searchInput');
+
+            // Desabilita interações até a API estar ok
+            mainBtn.disabled = true;
+            searchInput.disabled = true;
+            mainBtn.classList.add('opacity-50', 'cursor-not-allowed');
+
+            // Primeira tentativa imediata
+            checkApiStatus();
+
+            // Repetir a cada 5 segundos até conseguir
+            apiStatusInterval = setInterval(checkApiStatus, 5000);
+
+            // Caso o usuário altere o token, reinicia o fluxo de checagem
+            document.getElementById('tokenInput').addEventListener('input', () => {
+                apiReady = false;
+                if (!apiStatusInterval) {
+                    apiStatusInterval = setInterval(checkApiStatus, 5000);
+                }
+                checkApiStatus();
+            });
+        });
     </script>
 </body>
 
