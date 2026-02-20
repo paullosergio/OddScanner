@@ -8,51 +8,36 @@ app.use(cors()) // Libera o acesso para o seu frontend
 app.use(express.json())
 
 app.get("/status", (req, res) => {
-	return res.status(200).json({
+	res.status(200).json({
 		ok: true,
-		message: "Proxy local rodando",
+		tokenConfigured: !!SAVED_TOKEN,
 		uptime: process.uptime(),
 		timestamp: new Date().toISOString(),
 	})
 })
 
 app.get("/get-odds", async (req, res) => {
-	const token = req.headers.authorization
+	if (!SAVED_TOKEN) {
+		return res.status(401).json({
+			error: "Token não configurado",
+		})
+	}
 
 	try {
 		const response = await axios.get(API_URL, {
 			headers: {
-				authorization: token,
+				authorization: `Bearer ${SAVED_TOKEN}`,
 				Referer: API_REFERRER,
 				"User-Agent":
 					"Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:147.0) Gecko/20100101 Firefox/147.0",
 			},
 		})
+
 		res.json(response.data)
 	} catch (e) {
-		res.status(e.response?.status || 500).send(e.message)
-	}
-})
-
-// No seu proxy.js
-app.get("/get-details", async (req, res) => {
-	const slug = req.query.slug // Pega o identificador enviado pelo frontend
-	const token = req.headers.authorization
-
-	try {
-		const response = await axios.get(`${API_URL}/${slug}`, {
-			headers: {
-				authorization: token,
-				Referer: API_REFERRER,
-				"User-Agent": "Mozilla/5.0...",
-			},
-		})
-		res.json(response.data)
-	} catch (e) {
-		console.error(e.response?.data || e.message)
-
 		res.status(e.response?.status || 500).json({
-			error: e.response?.data || e.message,
+			error: "Erro ao buscar odds",
+			details: e.response?.data || e.message,
 		})
 	}
 })

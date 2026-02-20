@@ -1,15 +1,22 @@
 {
-    "$schema": "https://biomejs.dev/schema/2.3.11/schema.json",
-    "formatter": {
-      "enabled": true,
-      "indentStyle": "tab",
-      "indentWidth": 4,
-      "lineWidth": 100
-    },
-    "javascript": {
-      "formatter": {
-        "semicolons": "asNeeded"
-      }
-    }
-  }
-  
+	"$schema": "https://biomejs.dev/schemas/latest/schema.json",
+
+	"formatter": {
+		"enabled": true,
+		"indentStyle": "tab",
+		"indentWidth": 4,
+		"lineWidth": 100
+	},
+
+	"javascript": {
+		"formatter": {
+			"semicolons": "asNeeded"
+		}
+	},
+
+	"html": {
+		"formatter": {
+			"enabled": true
+		}
+	}
+}

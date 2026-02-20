@@ -1,238 +1,267 @@
 <!DOCTYPE html>
 <html lang="pt-br">
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<title>Arbitrage Scanner - Pro Dashboard</title>
+		<script src="https://cdn.tailwindcss.com"></script>
+		<style>
+		::-webkit-scrollbar {
+			width: 8px;
+		}
+		::-webkit-scrollbar-track {
+			background: #1e293b;
+		}
+		::-webkit-scrollbar-thumb {
+			background: #334155;
+			border-radius: 4px;
+		}
+		::-webkit-scrollbar-thumb:hover {
+			background: #475569;
+		}
+		.modal-animate {
+			animation: fadeIn 0.2s ease-out;
+		}
+		@keyframes fadeIn {
+			from {
+				opacity: 0;
+				transform: scale(0.95);
+			}
+			to {
+				opacity: 1;
+				transform: scale(1);
+			}
+		}
+		</style>
+	</head>
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Arbitrage Scanner - Pro Dashboard</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: #1e293b; }
-        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #475569; }
-        .modal-animate { animation: fadeIn 0.2s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
-    </style>
-</head>
+	<body class="bg-slate-900 text-slate-100 min-h-screen font-sans text-xs md:text-sm">
+		<div class="max-w-5xl mx-auto p-4 md:p-8">
+			<div class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+				<div>
+					<h1 class="text-3xl font-black text-blue-500 tracking-tight italic">
+						SCANNER <span class="text-white">ROI</span>
+					</h1>
+					<p class="text-slate-400 text-[10px] uppercase tracking-widest font-bold">
+						Horários ajustados (-3h BRT)
+					</p>
+				</div>
+				<div
+					id="timerDisplay"
+					class="bg-slate-800 border border-slate-700 px-4 py-2 rounded-xl font-mono text-blue-400 shadow-lg text-center min-w-[200px]"
+				>
+					Status: Aguardando Token
+				</div>
+			</div>
 
-<body class="bg-slate-900 text-slate-100 min-h-screen font-sans text-xs md:text-sm">
+			<div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-2xl mb-8">
+				<label
+					class="block text-[10px] font-black text-slate-500 uppercase mb-2 tracking-widest"
+				>
+					Bearer Token (JWT)
+				</label>
 
-    <div class="max-w-5xl mx-auto p-4 md:p-8">
-        <div class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
-            <div>
-                <h1 class="text-3xl font-black text-blue-500 tracking-tight italic">SCANNER <span class="text-white">ROI</span></h1>
-                <p class="text-slate-400 text-[10px] uppercase tracking-widest font-bold">Horários ajustados (-3h BRT)</p>
-            </div>
-            <div id="timerDisplay" class="bg-slate-800 border border-slate-700 px-4 py-2 rounded-xl font-mono text-blue-400 shadow-lg text-center min-w-[200px]">
-                Status: Aguardando Token
-            </div>
-        </div>
+				<div class="mt-4 relative">
+					<input
+						type="text"
+						id="searchInput"
+						oninput="handleSearch()"
+						class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 pl-10 text-white outline-none focus:border-blue-500 transition-all"
+						placeholder="Filtrar por time ou competição..."
+					>
+					<span class="absolute left-3 top-3.5 opacity-40">🔍</span>
+				</div>
 
-        <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-2xl mb-8">
-            <label class="block text-[10px] font-black text-slate-500 uppercase mb-2 tracking-widest">Bearer Token (JWT)</label>
-            <textarea id="tokenInput" rows="2" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-4 font-mono text-blue-300 outline-none focus:border-blue-500 transition-all placeholder:text-slate-700" placeholder="Cole o token aqui..."></textarea>
-            
-            <div class="mt-4 relative">
-                <input type="text" id="searchInput" oninput="handleSearch()" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 pl-10 text-white outline-none focus:border-blue-500 transition-all" placeholder="Filtrar por time ou competição...">
-                <span class="absolute left-3 top-3.5 opacity-40">🔍</span>
-            </div>
+				<button
+					onclick="startAutoUpdate()"
+					id="mainBtn"
+					class="mt-4 w-full bg-blue-600 hover:bg-blue-500 text-white py-4 rounded-xl font-black uppercase tracking-widest transition-all active:scale-[0.98] shadow-xl flex justify-center items-center gap-2 text-sm"
+				>
+					<span id="btnIcon">🚀</span>
+					<span id="btnText">Iniciar Monitoramento (10s)</span>
+				</button>
+			</div>
 
-            <button onclick="startAutoUpdate()" id="mainBtn" class="mt-4 w-full bg-blue-600 hover:bg-blue-500 text-white py-4 rounded-xl font-black uppercase tracking-widest transition-all active:scale-[0.98] shadow-xl flex justify-center items-center gap-2 text-sm">
-                <span id="btnIcon">🚀</span> <span id="btnText">Iniciar Monitoramento (10s)</span>
-            </button>
-        </div>
+			<div
+				id="statusMessage"
+				class="mb-6 text-center font-medium text-slate-400 italic"
+			></div>
+			<div id="oddsContainer" class="grid gap-4"></div>
+		</div>
 
-        <div id="statusMessage" class="mb-6 text-center font-medium text-slate-400 italic"></div>
-        <div id="oddsContainer" class="grid gap-4"></div>
-    </div>
+		<div
+			id="modal"
+			class="fixed inset-0 bg-slate-950/90 hidden backdrop-blur-sm z-50 flex items-center justify-center p-4 text-slate-100"
+		>
+			<div
+				class="bg-slate-800 w-full max-w-3xl max-h-[95vh] rounded-3xl overflow-hidden border border-slate-700 shadow-2xl modal-animate flex flex-col"
+			>
+				<div
+					class="p-6 border-b border-slate-700 flex justify-between items-center bg-slate-800/50"
+				>
+					<h3
+						class="text-xl font-black uppercase tracking-tighter italic"
+						id="modalMatchTitle"
+					>
+						Informações do Jogo
+					</h3>
+					<button
+						onclick="closeModal()"
+						class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-700 transition-colors text-slate-400 hover:text-white text-2xl"
+					>
+						&times;
+					</button>
+				</div>
+				<div id="modalContent" class="p-6 overflow-y-auto"></div>
+			</div>
+		</div>
 
-    <div id="modal" class="fixed inset-0 bg-slate-950/90 hidden backdrop-blur-sm z-50 flex items-center justify-center p-4 text-slate-100">
-        <div class="bg-slate-800 w-full max-w-3xl max-h-[95vh] rounded-3xl overflow-hidden border border-slate-700 shadow-2xl modal-animate flex flex-col">
-            <div class="p-6 border-b border-slate-700 flex justify-between items-center bg-slate-800/50">
-                <h3 class="text-xl font-black uppercase tracking-tighter italic" id="modalMatchTitle">Informações do Jogo</h3>
-                <button onclick="closeModal()" class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-700 transition-colors text-slate-400 hover:text-white text-2xl">&times;</button>
-            </div>
-            <div id="modalContent" class="p-6 overflow-y-auto"></div>
-        </div>
-    </div>
+		<script>
+		let updateInterval = null
+		let timeLeft = 10
+		let timerId = null
+		let currentActiveKey = null // Armazena a key do jogo aberto no modal
+		let cachedJogos = []
+		let apiStatusInterval = null
+		let apiReady = false
 
-    <script>
-        let updateInterval = null;
-        let timeLeft = 10;
-        let timerId = null;
-        let currentActiveSlug = null;
-        let cachedJogos = []; // Armazena os dados para filtrar sem nova requisição
-        let apiStatusInterval = null;
-        let apiReady = false;
+		function adjustTime(timeStr) {
+			if (!timeStr || !timeStr.includes(":")) return timeStr
+			let [hours, minutes] = timeStr.split(":").map(Number)
+			hours = (hours - 3 + 24) % 24
+			return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`
+		}
 
-        async function loadToken() {
-        const res = await fetch("https://oddscanner.onrender.com/get-token");
-        const data = await res.json();
+		async function checkApiStatus() {
+			const mainBtn = document.getElementById("mainBtn")
+			const searchInput = document.getElementById("searchInput")
+			const timerDisplayElement = document.getElementById("timerDisplay")
+			const statusMessageElement = document.getElementById("statusMessage")
 
-        if (data.token) {
-            document.getElementById("tokenInput").value = data.token;
-        }
-        }
+			try {
+				const statusResponse = await fetch("https://oddscanner.onrender.com/status")
+				if (!statusResponse.ok) throw new Error()
 
-        window.onload = loadToken;
+				apiReady = true
+				mainBtn.disabled = false
+				searchInput.disabled = false
+				mainBtn.classList.remove("opacity-50", "cursor-not-allowed")
+				timerDisplayElement.innerText = "API Online - pronto para monitorar"
 
+				if (apiStatusInterval) {
+					clearInterval(apiStatusInterval)
+					apiStatusInterval = null
+				}
+			} catch {
+				apiReady = false
+				mainBtn.disabled = true
+				timerDisplayElement.innerText = "API Offline"
+			}
+		}
 
-        function adjustTime(timeStr) {
-            if (!timeStr || !timeStr.includes(':')) return timeStr;
-            let [hours, minutes] = timeStr.split(':').map(Number);
-            hours = (hours - 3 + 24) % 24;
-            return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
-        }
+		async function startAutoUpdate() {
+			if (!apiReady) return alert("Aguardando a API ficar online...")
 
-        async function checkApiStatus() {
-            const tokenValue = document.getElementById('tokenInput').value.trim();
-            const mainBtn = document.getElementById('mainBtn');
-            const searchInput = document.getElementById('searchInput');
-            const timerDisplayElement = document.getElementById('timerDisplay');
-            const statusMessageElement = document.getElementById('statusMessage');
+			const btnText = document.getElementById("btnText")
+			const timerDisplayElement = document.getElementById("timerDisplay")
 
-            if (!tokenValue) {
-                apiReady = false;
-                mainBtn.disabled = true;
-                searchInput.disabled = true;
-                mainBtn.classList.add('opacity-50', 'cursor-not-allowed');
-                timerDisplayElement.innerText = "Status: Aguardando Token";
-                return;
-            }
+			btnText.innerText = "Monitorando..."
+			if (updateInterval) clearInterval(updateInterval)
+			if (timerId) clearInterval(timerId)
 
-            timerDisplayElement.innerText = "Verificando status da API...";
+			fetchOdds()
+			updateInterval = setInterval(fetchOdds, 10000)
 
-            try {
-                // Verifica diretamente o status da API principal
-                const statusResponse = await fetch('https://oddscanner.onrender.com/status');
+			timerId = setInterval(() => {
+				if (timeLeft <= 1) timeLeft = 10
+				else timeLeft--
+				timerDisplayElement.innerText = `PRÓXIMO SCAN EM: ${timeLeft}s`
+			}, 1000)
+		}
 
-                if (!statusResponse.ok) {
-                    throw new Error('Falha na verificação de status');
-                }
+		function handleSearch() {
+			renderList(cachedJogos)
+		}
 
-                let statusText = statusResponse.status;
-                try {
-                    const statusData = await statusResponse.json();
-                    statusText = statusData.status || statusText;
-                } catch {
-                    // Se não for JSON, usa apenas o status HTTP
-                }
+		function calculateCustomArbitrage(books) {
+			const grupoPA = books.filter(
+				(b) =>
+					!b.bookmaker.toLowerCase().endsWith("so") &&
+					!b.bookmaker.toLowerCase().includes("pinnacle"),
+			)
+			if (grupoPA.length === 0) return null
 
-                apiReady = true;
-                mainBtn.disabled = false;
-                searchInput.disabled = false;
-                mainBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-                statusMessageElement.innerHTML = `API Online (status ${statusText})`;
-                timerDisplayElement.innerText = "API Online - pronto para monitorar";
+			const best1 = grupoPA.reduce((prev, curr) => (curr.odd1 > prev.odd1 ? curr : prev), {
+				odd1: 0,
+				bookmaker: "N/A",
+			})
+			const best2 = grupoPA.reduce((prev, curr) => (curr.odd2 > prev.odd2 ? curr : prev), {
+				odd2: 0,
+				bookmaker: "N/A",
+			})
+			const bestX = books.reduce((prev, curr) => (curr.oddX > prev.oddX ? curr : prev), {
+				oddX: 0,
+				bookmaker: "N/A",
+			})
 
-                if (apiStatusInterval) {
-                    clearInterval(apiStatusInterval);
-                    apiStatusInterval = null;
-                }
-            } catch {
-                apiReady = false;
-                mainBtn.disabled = true;
-                searchInput.disabled = true;
-                mainBtn.classList.add('opacity-50', 'cursor-not-allowed');
-                statusMessageElement.innerText = "API offline ou inacessível. Tentando novamente a cada 5s...";
-                timerDisplayElement.innerText = "API Offline";
-            }
-        }
+			const margin = 1 / best1.odd1 + 1 / bestX.oddX + 1 / best2.odd2
+			return { best1, bestX, best2, roi: (1 / margin - 1) * 100 }
+		}
 
-        async function startAutoUpdate() {
-            const tokenElement = document.getElementById('tokenInput');
-            const tokenValue = tokenElement.value.trim();
-            if (!tokenValue) return alert("Insira o token.");
+		async function fetchOdds() {
+			try {
+				const response = await fetch("https://oddscanner.onrender.com/get-odds")
+				const result = await response.json()
 
-            if (!apiReady) {
-                alert("Aguardando a API ficar online. Por favor, aguarde alguns segundos.");
-                return;
-            }
+				cachedJogos = result.data
+					.map((item) => {
+						const arb = calculateCustomArbitrage(item.books)
+						return { ...item, customArb: arb }
+					})
+					.filter((item) => item.customArb !== null)
+					.sort((a, b) => b.customArb.roi - a.customArb.roi)
 
-            const mainBtn = document.getElementById('mainBtn');
-            const btnText = document.getElementById('btnText');
-            const btnIcon = document.getElementById('btnIcon');
-            const timerDisplayElement = document.getElementById('timerDisplay');
+				renderList(cachedJogos)
 
-            // API já está OK, apenas inicia o monitoramento
-            btnText.innerText = "Monitorando...";
-            btnIcon.textContent = "🚀";
+				// Se o modal estiver aberto, atualiza os dados dele com o que acabou de chegar
+				if (currentActiveKey) {
+					updateModalDetails(currentActiveKey)
+				}
 
-            if (updateInterval) clearInterval(updateInterval);
-            if (timerId) clearInterval(timerId);
+				timeLeft = 10
+				document.getElementById("statusMessage").innerHTML =
+					`Sincronizado às ${new Date().toLocaleTimeString()}`
+			} catch (error) {
+				document.getElementById("statusMessage").innerText = "Erro de Conexão."
+			}
+		}
 
-            fetchOdds();
-            updateInterval = setInterval(() => {
-                fetchOdds();
-                if (currentActiveSlug) updateModalDetails(currentActiveSlug);
-            }, 10000);
+		function renderList(jogos) {
+			const container = document.getElementById("oddsContainer")
+			const searchTerm = document.getElementById("searchInput").value.toLowerCase()
+			container.innerHTML = ""
 
-            timerId = setInterval(() => {
-                if (timeLeft <= 1) timeLeft = 10; else timeLeft--;
-                timerDisplayElement.innerText = `PRÓXIMO SCAN EM: ${timeLeft}s`;
-            }, 1000);
+			const filteredJogos = jogos.filter((item) => {
+				const matchString =
+					`${item.match.team1} ${item.match.team2} ${item.match.competition}`.toLowerCase()
+				return matchString.includes(searchTerm)
+			})
 
-            mainBtn.disabled = false;
-            mainBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-        }
+			if (filteredJogos.length === 0) {
+				container.innerHTML = `<div class="text-center py-10 text-slate-500">Nenhum jogo encontrado.</div>`
+				return
+			}
 
-        function handleSearch() {
-            renderList(cachedJogos);
-        }
-
-        function calculateCustomArbitrage(books) {
-            const grupoPA = books.filter(b => !b.bookmaker.toLowerCase().endsWith('so') && !b.bookmaker.toLowerCase().includes('pinnacle'));
-            if (grupoPA.length === 0) return null;
-            const best1 = grupoPA.reduce((prev, curr) => (curr.odd1 > prev.odd1) ? curr : prev, { odd1: 0, bookmaker: 'N/A' });
-            const best2 = grupoPA.reduce((prev, curr) => (curr.odd2 > prev.odd2) ? curr : prev, { odd2: 0, bookmaker: 'N/A' });
-            const bestX = books.reduce((prev, curr) => (curr.oddX > prev.oddX) ? curr : prev, { oddX: 0, bookmaker: 'N/A' });
-            const margin = (1 / best1.odd1) + (1 / bestX.oddX) + (1 / best2.odd2);
-            return { best1, bestX, best2, roi: ((1 / margin) - 1) * 100 };
-        }
-
-        async function fetchOdds() {
-            const token = document.getElementById('tokenInput').value.trim().replace('Bearer ', '');
-            try {
-                const response = await fetch('https://oddscanner.onrender.com/get-odds', { headers: { 'authorization': `Bearer ${token}` } });
-                const result = await response.json();
-                
-                cachedJogos = result.data.map(item => {
-                    const arb = calculateCustomArbitrage(item.books);
-                    return { ...item, customArb: arb };
-                }).filter(item => item.customArb !== null).sort((a, b) => b.customArb.roi - a.customArb.roi);
-                
-                renderList(cachedJogos);
-                timeLeft = 10;
-                document.getElementById('statusMessage').innerHTML = `Sincronizado às ${new Date().toLocaleTimeString()}`;
-            } catch (error) { document.getElementById('statusMessage').innerText = "Erro de Conexão."; }
-        }
-
-        function renderList(jogos) {
-            const container = document.getElementById('oddsContainer');
-            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
-            container.innerHTML = '';
-
-            const filteredJogos = jogos.filter(item => {
-                const matchString = `${item.match.team1} ${item.match.team2} ${item.match.competition}`.toLowerCase();
-                return matchString.includes(searchTerm);
-            });
-
-            if (filteredJogos.length === 0) {
-                container.innerHTML = `<div class="text-center py-10 text-slate-500">Nenhum jogo encontrado com "${searchTerm}"</div>`;
-                return;
-            }
-
-            filteredJogos.forEach(item => {
-                const arb = item.customArb;
-                const adjustedKickoff = adjustTime(item.match.kickoff_display);
-                const card = document.createElement('div');
-                card.className = `bg-slate-800 p-5 rounded-2xl border border-slate-700 hover:border-blue-500/50 transition-all shadow-lg flex flex-col md:flex-row justify-between items-center gap-4`;
-                card.onclick = () => openDetails(item.key);
-                card.innerHTML = `
-                    <div class="flex-1 cursor-pointer w-full">
+			filteredJogos.forEach((item) => {
+				const arb = item.customArb
+				const adjustedKickoff = adjustTime(item.match.kickoff_display)
+				const card = document.createElement("div")
+				card.className = `bg-slate-800 p-5 rounded-2xl border border-slate-700 hover:border-blue-500/50 transition-all shadow-lg flex flex-col md:flex-row justify-between items-center gap-4 cursor-pointer`
+				card.onclick = () => openDetails(item.key)
+				card.innerHTML = `
+                    <div class="flex-1 w-full">
                         <div class="flex items-center gap-2 mb-1">
-                            <span class="bg-blue-500/10 text-blue-500 text-[9px] font-black px-2 py-0.5 rounded uppercase tracking-tighter">${item.match.competition || 'Futebol'}</span>
+                            <span class="bg-blue-500/10 text-blue-500 text-[9px] font-black px-2 py-0.5 rounded uppercase tracking-tighter">${item.match.competition || "Futebol"}</span>
                             <span class="text-slate-500 text-[10px] font-bold">${adjustedKickoff}</span>
                         </div>
                         <h2 class="text-lg font-bold">${item.match.team1} x ${item.match.team2}</h2>
@@ -247,112 +276,118 @@
                             <span class="block text-[9px] text-slate-500 font-black uppercase tracking-tighter">ROI P.A.</span>
                             <span class="text-xl font-black ${arb.roi > 0 ? "text-green-400" : "text-rose-500"}">${arb.roi.toFixed(2)}%</span>
                         </div>
-                    </div>`;
-                container.appendChild(card);
-            });
-        }
+                    </div>`
+				container.appendChild(card)
+			})
+		}
 
-        async function openDetails(slug) {
-            currentActiveSlug = slug;
-            document.getElementById('modal').classList.remove('hidden');
-            document.getElementById('modalContent').innerHTML = `<div class="py-20 text-center text-blue-400 animate-pulse font-bold uppercase text-xs tracking-widest">Carregando Mercado...</div>`;
-            updateModalDetails(slug);
-        }
+		// AGORA USA OS DADOS CACHEADOS EM VEZ DE FAZER FETCH
+		function openDetails(key) {
+			currentActiveKey = key
+			document.getElementById("modal").classList.remove("hidden")
+			updateModalDetails(key)
+		}
 
-        function getCalcLink(b1, bX, b2) {
-            const config = {
-                numberOfHouses: 3,
-                casaName1: b1.bookmaker.toUpperCase(), odd1: b1.odd1,
-                casaName2: bX.bookmaker.toUpperCase(), odd2: bX.oddX,
-                casaName3: b2.bookmaker.toUpperCase(), odd3: b2.odd2,
-                stake1: 100, selectedStake: "stake1", isLay1: false, isLay2: false, isLay3: false, profits: [0, 0, 0]
-            };
-            return `https://filtrodeapostas.com/calculator?arbitrage=${encodeURIComponent(JSON.stringify(config))}`;
-        }
+		function updateModalDetails(key) {
+			// Busca o jogo nos dados que já temos
+			const jogo = cachedJogos.find((j) => j.key === key)
 
-        async function updateModalDetails(slug) {
-            const token = document.getElementById('tokenInput').value.trim().replace('Bearer ', '');
-            try {
-                const response = await fetch(`https://oddscanner.onrender.com/get-details?slug=${encodeURIComponent(slug)}`, { headers: { 'authorization': `Bearer ${token}` } });
-                const result = await response.json();
-                const jogo = result.data;
-                const adjustedKickoff = adjustTime(jogo.match.kickoff_display);
+			if (!jogo) {
+				document.getElementById("modalContent").innerHTML =
+					`<p class="text-center py-10">Jogo não encontrado ou expirado.</p>`
+				return
+			}
 
-                document.getElementById('modalMatchTitle').innerHTML = `
-                    <div class="flex flex-col text-sm md:text-base">
-                        <span class="text-white">${jogo.match.team1} x ${jogo.match.team2}</span>
-                        <span class="text-[10px] text-slate-500 font-normal mt-1 italic">${jogo.match.competition} | ${jogo.match.date} ${adjustedKickoff}</span>
-                    </div>`;
+			const adjustedKickoff = adjustTime(jogo.match.kickoff_display)
+			document.getElementById("modalMatchTitle").innerHTML = `
+                <div class="flex flex-col text-sm md:text-base">
+                    <span class="text-white">${jogo.match.team1} x ${jogo.match.team2}</span>
+                    <span class="text-[10px] text-slate-500 font-normal mt-1 italic">${jogo.match.competition} | ${jogo.match.date} ${adjustedKickoff}</span>
+                </div>`
 
-                const arb = calculateCustomArbitrage(jogo.books);
-                const calcLink = getCalcLink(arb.best1, arb.bestX, arb.best2);
-                const grupoPA = jogo.books.filter(b => !b.bookmaker.toLowerCase().endsWith('so') && !b.bookmaker.toLowerCase().includes('pinnacle'));
-                const grupoSO = jogo.books.filter(b => b.bookmaker.toLowerCase().endsWith('so') || b.bookmaker.toLowerCase().includes('pinnacle'));
+			const arb = jogo.customArb
+			const calcLink = getCalcLink(arb.best1, arb.bestX, arb.best2)
+			const grupoPA = jogo.books.filter(
+				(b) =>
+					!b.bookmaker.toLowerCase().endsWith("so") &&
+					!b.bookmaker.toLowerCase().includes("pinnacle"),
+			)
+			const grupoSO = jogo.books.filter(
+				(b) =>
+					b.bookmaker.toLowerCase().endsWith("so") ||
+					b.bookmaker.toLowerCase().includes("pinnacle"),
+			)
 
-                document.getElementById('modalContent').innerHTML = `
-                    <a href="${calcLink}" target="_blank" class="grid grid-cols-3 gap-4 mb-8 group hover:scale-[1.01] transition-transform">
-                        <div class="bg-slate-900 p-4 rounded-2xl border border-green-500/30 text-center"><span class="text-[8px] font-black text-green-400 uppercase block mb-1">CASA (P.A)</span><div class="text-xl font-black">${arb.best1.odd1.toFixed(2)}</div><div class="text-[9px] text-slate-500">${arb.best1.bookmaker}</div></div>
-                        <div class="bg-slate-900 p-4 rounded-2xl border border-blue-500/30 text-center"><span class="text-[8px] font-black text-blue-400 uppercase block mb-1">EMPATE (X)</span><div class="text-xl font-black">${arb.bestX.oddX.toFixed(2)}</div><div class="text-[9px] text-slate-500">${arb.bestX.bookmaker}</div></div>
-                        <div class="bg-slate-900 p-4 rounded-2xl border border-green-500/30 text-center"><span class="text-[8px] font-black text-green-400 uppercase block mb-1">FORA (P.A)</span><div class="text-xl font-black">${arb.best2.odd2.toFixed(2)}</div><div class="text-[9px] text-slate-500">${arb.best2.bookmaker}</div></div>
-                        <div class="col-span-full text-center text-[9px] text-slate-500 font-bold uppercase mt-2 group-hover:text-blue-400">🧮 ROI P.A: ${arb.roi.toFixed(2)}% | Clique para calcular</div>
-                    </a>
-                    <div class="space-y-6">
-                        <div><h3 class="text-green-400 text-[10px] font-black uppercase mb-3 flex items-center gap-2">🟢 Com Pagamento Antecipado</h3>${renderTable(grupoPA)}</div>
-                        <div><h3 class="text-slate-500 text-[10px] font-black uppercase mb-3 flex items-center gap-2">⚪ Sem Pagamento Antecipado</h3>${renderTable(grupoSO)}</div>
-                    </div>`;
-            } catch (e) { document.getElementById('modalContent').innerHTML = `<p class="text-red-500 text-center">Erro ao atualizar dados.</p>`; }
-        }
+			document.getElementById("modalContent").innerHTML = `
+                <a href="${calcLink}" target="_blank" class="grid grid-cols-3 gap-4 mb-8 group hover:scale-[1.01] transition-transform">
+                    <div class="bg-slate-900 p-4 rounded-2xl border border-green-500/30 text-center"><span class="text-[8px] font-black text-green-400 uppercase block mb-1">CASA (P.A)</span><div class="text-xl font-black">${arb.best1.odd1.toFixed(2)}</div><div class="text-[9px] text-slate-500">${arb.best1.bookmaker}</div></div>
+                    <div class="bg-slate-900 p-4 rounded-2xl border border-blue-500/30 text-center"><span class="text-[8px] font-black text-blue-400 uppercase block mb-1">EMPATE (X)</span><div class="text-xl font-black">${arb.bestX.oddX.toFixed(2)}</div><div class="text-[9px] text-slate-500">${arb.bestX.bookmaker}</div></div>
+                    <div class="bg-slate-900 p-4 rounded-2xl border border-green-500/30 text-center"><span class="text-[8px] font-black text-green-400 uppercase block mb-1">FORA (P.A)</span><div class="text-xl font-black">${arb.best2.odd2.toFixed(2)}</div><div class="text-[9px] text-slate-500">${arb.best2.bookmaker}</div></div>
+                    <div class="col-span-full text-center text-[9px] text-slate-500 font-bold uppercase mt-2 group-hover:text-blue-400">🧮 ROI P.A: ${arb.roi.toFixed(2)}% | Clique para calcular</div>
+                </a>
+                <div class="space-y-6">
+                    <div><h3 class="text-green-400 text-[10px] font-black uppercase mb-3 flex items-center gap-2">🟢 Com Pagamento Antecipado</h3>${renderTable(grupoPA)}</div>
+                    <div><h3 class="text-slate-500 text-[10px] font-black uppercase mb-3 flex items-center gap-2">⚪ Sem Pagamento Antecipado</h3>${renderTable(grupoSO)}</div>
+                </div>`
+		}
 
-        function renderTable(lista) {
-            if (!lista.length) return `<p class="text-slate-600 text-[10px] italic p-4 text-center">Nenhuma casa registrada.</p>`;
-            const max1 = Math.max(...lista.map(b => b.odd1)), maxX = Math.max(...lista.map(b => b.oddX)), max2 = Math.max(...lista.map(b => b.odd2));
-            return `
+		function getCalcLink(b1, bX, b2) {
+			const config = {
+				numberOfHouses: 3,
+				casaName1: b1.bookmaker.toUpperCase(),
+				odd1: b1.odd1,
+				casaName2: bX.bookmaker.toUpperCase(),
+				odd2: bX.oddX,
+				casaName3: b2.bookmaker.toUpperCase(),
+				odd3: b2.odd2,
+				stake1: 100,
+				selectedStake: "stake1",
+				isLay1: false,
+				isLay2: false,
+				isLay3: false,
+				profits: [0, 0, 0],
+			}
+			return `https://filtrodeapostas.com/calculator?arbitrage=${encodeURIComponent(JSON.stringify(config))}`
+		}
+
+		function renderTable(lista) {
+			if (!lista.length)
+				return `<p class="text-slate-600 text-[10px] italic p-4 text-center">Nenhuma casa registrada.</p>`
+			const max1 = Math.max(...lista.map((b) => b.odd1)),
+				maxX = Math.max(...lista.map((b) => b.oddX)),
+				max2 = Math.max(...lista.map((b) => b.odd2))
+			return `
                 <div class="overflow-hidden rounded-2xl border border-slate-700/50">
                     <table class="w-full text-left text-xs font-mono">
                         <thead class="bg-slate-900 text-slate-500 uppercase text-[8px] font-black tracking-widest">
                             <tr><th class="px-4 py-3">Bookmaker</th><th class="px-4 py-3 text-center">1</th><th class="px-4 py-3 text-center">X</th><th class="px-4 py-3 text-center">2</th></tr>
                         </thead>
                         <tbody class="divide-y divide-slate-700/50 bg-slate-800/40">
-                            ${lista.map(b => `
+                            ${lista
+								.map(
+									(b) => `
                                 <tr class="hover:bg-slate-700/30 transition-colors text-[11px]">
-                                    <td class="px-4 py-3 font-bold"><a href="${b.href || '#'}" target="_blank" class="text-blue-400 hover:text-white">${b.bookmaker}</a></td>
-                                    <td class="px-4 py-3 text-center ${b.odd1 === max1 ? 'text-green-400 font-black' : 'text-slate-400'}">${b.odd1.toFixed(2)}</td>
-                                    <td class="px-4 py-3 text-center ${b.oddX === maxX ? 'text-green-400 font-black' : 'text-slate-400'}">${b.oddX.toFixed(2)}</td>
-                                    <td class="px-4 py-3 text-center ${b.odd2 === max2 ? 'text-green-400 font-black' : 'text-slate-400'}">${b.odd2.toFixed(2)}</td>
-                                </tr>`).join('')}
+                                    <td class="px-4 py-3 font-bold"><a href="${b.href.replace(/bet366/gi, "bet365") || "#"}" target="_blank" class="text-blue-400 hover:text-white">${b.bookmaker}</a></td>
+                                    <td class="px-4 py-3 text-center ${b.odd1 === max1 ? "text-green-400 font-black" : "text-slate-400"}">${b.odd1.toFixed(2)}</td>
+                                    <td class="px-4 py-3 text-center ${b.oddX === maxX ? "text-green-400 font-black" : "text-slate-400"}">${b.oddX.toFixed(2)}</td>
+                                    <td class="px-4 py-3 text-center ${b.odd2 === max2 ? "text-green-400 font-black" : "text-slate-400"}">${b.odd2.toFixed(2)}</td>
+                                </tr>`,
+								)
+								.join("")}
                         </tbody>
                     </table>
-                </div>`;
-        }
+                </div>`
+		}
 
-        function closeModal() { currentActiveSlug = null; document.getElementById('modal').classList.add('hidden'); }
+		function closeModal() {
+			currentActiveKey = null
+			document.getElementById("modal").classList.add("hidden")
+		}
 
-        // Inicializa verificação automática de status da API a cada 5s
-        window.addEventListener('load', () => {
-            const mainBtn = document.getElementById('mainBtn');
-            const searchInput = document.getElementById('searchInput');
-
-            // Desabilita interações até a API estar ok
-            mainBtn.disabled = true;
-            searchInput.disabled = true;
-            mainBtn.classList.add('opacity-50', 'cursor-not-allowed');
-
-            // Primeira tentativa imediata
-            checkApiStatus();
-
-            // Repetir a cada 5 segundos até conseguir
-            apiStatusInterval = setInterval(checkApiStatus, 5000);
-
-            // Caso o usuário altere o token, reinicia o fluxo de checagem
-            document.getElementById('tokenInput').addEventListener('input', () => {
-                apiReady = false;
-                if (!apiStatusInterval) {
-                    apiStatusInterval = setInterval(checkApiStatus, 5000);
-                }
-                checkApiStatus();
-            });
-        });
-    </script>
-</body>
-
+		window.addEventListener("load", () => {
+			checkApiStatus()
+			apiStatusInterval = setInterval(checkApiStatus, 5000)
+		})
+		</script>
+	</body>
 </html>
